@@ -1,6 +1,7 @@
 import asyncio
 import threading
 import os
+import random
 from groq import Groq
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -16,6 +17,29 @@ RENDER_URL = os.environ.get("RENDER_URL")
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
+
+FALLBACK = [
+    "Hozir band, keyinroq gaplashamiz 🙂",
+    "Xabaringiz qabul qilindi, tez orada javob beraman!",
+    "Hozir ishim bor, keyinroq ko'ramiz 👍",
+    "Tushundim, keyinroq yozaman!",
+    "Hozir qulay vaqt emas, keyinroq aloqa qilamiz!",
+    "Ko'rdim, lekin hozir band. Tez orada!",
+    "Yaxshi, keyinroq gaplashamiz 🤝",
+    "Qabul qilindi, sabr qiling ozgina!",
+]
+
+used_fallback = []
+
+def get_fallback():
+    global used_fallback
+    remaining = [f for f in FALLBACK if f not in used_fallback]
+    if not remaining:
+        used_fallback = []
+        remaining = FALLBACK
+    choice = random.choice(remaining)
+    used_fallback.append(choice)
+    return choice
 
 app = Flask(__name__)
 
@@ -60,7 +84,7 @@ Qoidalar:
         return response.choices[0].message.content
     except Exception as e:
         print(f"Groq xato: {e}")
-        return "Hozir band, keyinroq gaplashamiz 🙂"
+        return get_fallback()
 
 async def keep_online():
     while True:
@@ -89,13 +113,11 @@ async def handler(event):
     if sender.bot:
         return
 
-    # 30 sekund kutish — agar siz javob bermasangiz AI javob bersin
     await asyncio.sleep(30)
 
-    # Oxirgi xabar o'zingizdan kelganmi tekshirish
     messages = await client.get_messages(event.sender_id, limit=1)
     if messages[0].out:
-        return  # Siz javob bergansiz — bot javob bermasin
+        return
 
     try:
         reply = await ask_groq(event.text)

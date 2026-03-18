@@ -2,3 +2,4 @@ telethon
 groq
 flask
 requests
+python-telegram-bot
