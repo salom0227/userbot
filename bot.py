@@ -82,11 +82,22 @@ async def keep_alive():
 async def handler(event):
     if not event.is_private:
         return
+    me = await client.get_me()
+    if event.sender_id == me.id:
+        return
     sender = await event.get_sender()
     if sender.bot:
         return
+
+    # 30 sekund kutish — agar siz javob bermasangiz AI javob bersin
+    await asyncio.sleep(30)
+
+    # Oxirgi xabar o'zingizdan kelganmi tekshirish
+    messages = await client.get_messages(event.sender_id, limit=1)
+    if messages[0].out:
+        return  # Siz javob bergansiz — bot javob bermasin
+
     try:
-        await asyncio.sleep(1)
         reply = await ask_groq(event.text)
         await event.reply(reply)
     except Exception as e:
