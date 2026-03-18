@@ -15,7 +15,7 @@ API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION = os.environ.get("SESSION")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-RENDER_URL = os.environ.get("RENDER_URL")
+RENDER_URL = os.environ.get("RENDER_URL", "")
 ANON_TOKEN = "8642757856:AAGDb_oRRDfEWMVX-dS53J8ZMYV8dYCT7G4"
 OWNER_ID = 5971527578
 
@@ -35,8 +35,9 @@ def run_flask():
 def ping_self():
     while True:
         try:
-            requests.get(RENDER_URL)
-            print("Ping yuborildi!")
+            if RENDER_URL:
+                requests.get(RENDER_URL)
+                print("Ping yuborildi!")
         except Exception:
             pass
         import time
@@ -71,12 +72,15 @@ async def handle_anon(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_map[sent.message_id] = user.id
     await update.message.reply_text("✅ Xabaringiz yetkazildi!")
 
-def run_anon_bot():
+async def run_anon_bot():
     anon_app = ApplicationBuilder().token(ANON_TOKEN).build()
     anon_app.add_handler(CommandHandler("start", start))
     anon_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_anon))
     print("Anonim bot ishga tushdi!")
-    anon_app.run_polling()
+    await anon_app.initialize()
+    await anon_app.start()
+    await anon_app.updater.start_polling()
+    await asyncio.Event().wait()
 
 # ============ USERBOT ============
 FALLBACK = [
@@ -173,6 +177,7 @@ async def main():
         await asyncio.gather(
             keep_online(),
             keep_alive(),
+            run_anon_bot(),
             client.run_until_disconnected()
         )
     except (KeyboardInterrupt, SystemExit, asyncio.CancelledError):
@@ -183,5 +188,4 @@ async def main():
 if __name__ == '__main__':
     threading.Thread(target=run_flask, daemon=True).start()
     threading.Thread(target=ping_self, daemon=True).start()
-    threading.Thread(target=run_anon_bot, daemon=True).start()
     asyncio.run(main())
