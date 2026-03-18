@@ -8,39 +8,21 @@ from telethon.sessions import StringSession
 from telethon.tl.functions.account import UpdateStatusRequest
 from flask import Flask
 import requests
+from telegram import Update
+from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION = os.environ.get("SESSION")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 RENDER_URL = os.environ.get("RENDER_URL")
+ANON_TOKEN = "8642757856:AAGDb_oRRDfEWMVX-dS53J8ZMYV8dYCT7G4"
+OWNER_ID = 5971527578
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-FALLBACK = [
-    "Hozir band, keyinroq gaplashamiz 🙂",
-    "Xabaringiz qabul qilindi, tez orada javob beraman!",
-    "Hozir ishim bor, keyinroq ko'ramiz 👍",
-    "Tushundim, keyinroq yozaman!",
-    "Hozir qulay vaqt emas, keyinroq aloqa qilamiz!",
-    "Ko'rdim, lekin hozir band. Tez orada!",
-    "Yaxshi, keyinroq gaplashamiz 🤝",
-    "Qabul qilindi, sabr qiling ozgina!",
-]
-
-used_fallback = []
-
-def get_fallback():
-    global used_fallback
-    remaining = [f for f in FALLBACK if f not in used_fallback]
-    if not remaining:
-        used_fallback = []
-        remaining = FALLBACK
-    choice = random.choice(remaining)
-    used_fallback.append(choice)
-    return choice
-
+# ============ FLASK ============
 app = Flask(__name__)
 
 @app.route('/')
@@ -59,6 +41,65 @@ def ping_self():
             pass
         import time
         time.sleep(240)
+
+# ============ ANONIM BOT ============
+user_map = {}
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Salom! 👋\n\n"
+        "Bu yerda fikr va izohlaringizni anonim yubora olasiz.\n"
+        "Xabaringizni yozing — kim ekanligingiz ma'lum bo'lmaydi! 📩"
+    )
+
+async def handle_anon(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    text = update.message.text
+
+    if update.effective_chat.id == OWNER_ID:
+        if update.message.reply_to_message:
+            original = update.message.reply_to_message.message_id
+            sender_id = user_map.get(original)
+            if sender_id:
+                await context.bot.send_message(sender_id, f"{text}")
+        return
+
+    sent = await context.bot.send_message(
+        OWNER_ID,
+        f"📩 Anonim xabar:\n\n{text}"
+    )
+    user_map[sent.message_id] = user.id
+    await update.message.reply_text("✅ Xabaringiz yetkazildi!")
+
+def run_anon_bot():
+    anon_app = ApplicationBuilder().token(ANON_TOKEN).build()
+    anon_app.add_handler(CommandHandler("start", start))
+    anon_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_anon))
+    print("Anonim bot ishga tushdi!")
+    anon_app.run_polling()
+
+# ============ USERBOT ============
+FALLBACK = [
+    "Hozir band, keyinroq gaplashamiz 🙂",
+    "Xabaringiz qabul qilindi, tez orada javob beraman!",
+    "Hozir ishim bor, keyinroq ko'ramiz 👍",
+    "Tushundim, keyinroq yozaman!",
+    "Hozir qulay vaqt emas, keyinroq aloqa qilamiz!",
+    "Ko'rdim, lekin hozir band. Tez orada!",
+    "Yaxshi, keyinroq gaplashamiz 🤝",
+    "Qabul qilindi, sabr qiling ozgina!",
+]
+used_fallback = []
+
+def get_fallback():
+    global used_fallback
+    remaining = [f for f in FALLBACK if f not in used_fallback]
+    if not remaining:
+        used_fallback = []
+        remaining = FALLBACK
+    choice = random.choice(remaining)
+    used_fallback.append(choice)
+    return choice
 
 async def ask_groq(text):
     try:
@@ -127,7 +168,7 @@ async def handler(event):
 
 async def main():
     await client.start()
-    print("Bot ishga tushdi!")
+    print("Userbot ishga tushdi!")
     try:
         await asyncio.gather(
             keep_online(),
@@ -142,4 +183,5 @@ async def main():
 if __name__ == '__main__':
     threading.Thread(target=run_flask, daemon=True).start()
     threading.Thread(target=ping_self, daemon=True).start()
+    threading.Thread(target=run_anon_bot, daemon=True).start()
     asyncio.run(main())
