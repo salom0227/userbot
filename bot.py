@@ -69,16 +69,27 @@ async def run_anon_bot():
         .token(ANON_TOKEN)
         .connect_timeout(30)
         .read_timeout(30)
+        .get_updates_connect_timeout(30)
+        .get_updates_read_timeout(30)
         .build()
     )
     anon_app.add_handler(CommandHandler("start", start))
     anon_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_anon))
-    print("Anonim bot ishga tushdi!")
+
     await anon_app.initialize()
-    # Oldingi webhook/polling qoldiqlarini tozalash
+
+    # Oldingi barcha ulanishlarni majburan uzish
     await anon_app.bot.delete_webhook(drop_pending_updates=True)
+    await asyncio.sleep(2)  # Telegram serveriga vaqt ber
+
     await anon_app.start()
-    await anon_app.updater.start_polling(drop_pending_updates=True)
+    await anon_app.updater.start_polling(
+        drop_pending_updates=True,
+        allowed_updates=["message"],
+        timeout=10,
+        bootstrap_retries=-1,
+    )
+    print("Anonim bot ishga tushdi!")
     await asyncio.Event().wait()
 
 user_state = {}
