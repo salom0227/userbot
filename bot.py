@@ -64,13 +64,21 @@ async def handle_anon(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Xabaringiz yetkazildi!")
 
 async def run_anon_bot():
-    anon_app = ApplicationBuilder().token(ANON_TOKEN).build()
+    anon_app = (
+        ApplicationBuilder()
+        .token(ANON_TOKEN)
+        .connect_timeout(30)
+        .read_timeout(30)
+        .build()
+    )
     anon_app.add_handler(CommandHandler("start", start))
     anon_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_anon))
     print("Anonim bot ishga tushdi!")
     await anon_app.initialize()
+    # Oldingi webhook/polling qoldiqlarini tozalash
+    await anon_app.bot.delete_webhook(drop_pending_updates=True)
     await anon_app.start()
-    await anon_app.updater.start_polling()
+    await anon_app.updater.start_polling(drop_pending_updates=True)
     await asyncio.Event().wait()
 
 user_state = {}
