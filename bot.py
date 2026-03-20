@@ -19,6 +19,7 @@ OWNER_ID = 5971527578
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
 is_online = False
+my_id = None
 
 app = Flask(__name__)
 
@@ -30,16 +31,15 @@ def run_flask():
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
 
 def ping_self():
+    import time
     while True:
         try:
             if RENDER_URL:
-                requests.get(RENDER_URL)
+                requests.get(RENDER_URL, timeout=10)
         except Exception:
             pass
-        import time
         time.sleep(240)
 
-# ============ ANONIM BOT ============
 user_map = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -52,7 +52,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_anon(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = update.message.text
-
     if update.effective_chat.id == OWNER_ID:
         if update.message.reply_to_message:
             original = update.message.reply_to_message.message_id
@@ -60,11 +59,7 @@ async def handle_anon(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if sender_id:
                 await context.bot.send_message(sender_id, f"{text}")
         return
-
-    sent = await context.bot.send_message(
-        OWNER_ID,
-        f"📩 Anonim xabar:\n\n{text}"
-    )
+    sent = await context.bot.send_message(OWNER_ID, f"📩 Anonim xabar:\n\n{text}")
     user_map[sent.message_id] = user.id
     await update.message.reply_text("✅ Xabaringiz yetkazildi!")
 
@@ -78,45 +73,42 @@ async def run_anon_bot():
     await anon_app.updater.start_polling()
     await asyncio.Event().wait()
 
-# ============ USERBOT ============
 user_state = {}
 
 @client.on(events.UserUpdate)
 async def track_online(event):
-    global is_online
-    me = await client.get_me()
-    if event.user_id == me.id:
-        if event.online:
-            is_online = True
-            print("Siz onlinesiz — bot jim!")
-        elif event.offline:
-            is_online = False
-            print("Siz offlinesiz — bot yozadi!")
+    global is_online, my_id
+    if my_id is None or event.user_id != my_id:
+        return
+    if event.online:
+        is_online = True
+        print("Siz onlinesiz — bot jim!")
+    else:
+        is_online = False
+        print("Siz offlinesiz — bot yozadi!")
 
 @client.on(events.NewMessage(incoming=True))
 async def handler(event):
-    global is_online
-    if not event.is_private:
+    global is_online, my_id
+    if not event.is_private or my_id is None or event.sender_id == my_id:
         return
-    me = await client.get_me()
-    if event.sender_id == me.id:
+    try:
+        sender = await event.get_sender()
+        if sender is None or sender.bot:
+            return
+    except Exception:
         return
-    sender = await event.get_sender()
-    if sender.bot:
-        return
-
     await asyncio.sleep(5)
-
     if is_online:
         return
-
-    messages = await client.get_messages(event.sender_id, limit=1)
-    if messages[0].out:
+    try:
+        messages = await client.get_messages(event.sender_id, limit=1)
+        if messages and messages[0].out:
+            return
+    except Exception:
         return
-
     sender_id = str(event.sender_id)
     count = user_state.get(sender_id, 0)
-
     try:
         if count == 0:
             await event.reply("Assalomu alaykum! 👋")
@@ -132,21 +124,24 @@ async def keep_online():
     while True:
         try:
             await client(UpdateStatusRequest(offline=False))
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"keep_online xato: {e}")
         await asyncio.sleep(240)
 
 async def keep_alive():
     while True:
         try:
             await client.get_me()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"keep_alive xato: {e}")
         await asyncio.sleep(60)
 
 async def main():
+    global my_id
     await client.start()
-    print("Userbot ishga tushdi!")
+    me = await client.get_me()
+    my_id = me.id
+    print(f"Userbot ishga tushdi! ID: {my_id}")
     try:
         await asyncio.gather(
             keep_online(),
