@@ -4,6 +4,7 @@ import os
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.account import UpdateStatusRequest
+from telethon.tl.functions.users import GetFullUserRequest
 from flask import Flask
 import requests
 from telegram import Update
@@ -17,6 +18,9 @@ ANON_TOKEN = "8642757856:AAGDb_oRRDfEWMVX-dS53J8ZMYV8dYCT7G4"
 OWNER_ID = 5971527578
 
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
+
+# Online holatini saqlash
+is_online = False
 
 app = Flask(__name__)
 
@@ -79,8 +83,23 @@ async def run_anon_bot():
 # ============ USERBOT ============
 user_state = {}
 
+# Online/offline holatini kuzatish
+@client.on(events.UserUpdate)
+async def track_online(event):
+    global is_online
+    me = await client.get_me()
+    if event.user_id == me.id:
+        if event.online:
+            is_online = True
+            print("Siz onlinesiz — bot jim!")
+        elif event.offline:
+            is_online = False
+            print("Siz offlinesiz — bot yozadi!")
+
 @client.on(events.NewMessage(incoming=True))
 async def handler(event):
+    global is_online
+
     # Faqat shaxsiy chat
     if not event.is_private:
         return
@@ -95,6 +114,10 @@ async def handler(event):
 
     # 5 sekund kutish
     await asyncio.sleep(5)
+
+    # Siz onlinesiz — bot jim
+    if is_online:
+        return
 
     # Agar siz javob bergan bo'lsangiz — jim tur
     messages = await client.get_messages(event.sender_id, limit=1)
@@ -116,9 +139,11 @@ async def handler(event):
         print(f"Handler xato: {e}")
 
 async def keep_online():
+    global is_online
     while True:
         try:
             await client(UpdateStatusRequest(offline=False))
+            is_online = True
         except Exception:
             pass
         await asyncio.sleep(240)
