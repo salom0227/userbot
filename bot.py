@@ -81,17 +81,22 @@ user_state = {}
 
 @client.on(events.NewMessage(incoming=True))
 async def handler(event):
+    # Faqat shaxsiy chat
     if not event.is_private:
         return
+    # O'zidan kelgan xabar
     me = await client.get_me()
     if event.sender_id == me.id:
         return
+    # Botlardan kelgan xabar
     sender = await event.get_sender()
     if sender.bot:
         return
 
-    await asyncio.sleep(30)
+    # 5 sekund kutish
+    await asyncio.sleep(5)
 
+    # Agar siz javob bergan bo'lsangiz — jim tur
     messages = await client.get_messages(event.sender_id, limit=1)
     if messages[0].out:
         return
